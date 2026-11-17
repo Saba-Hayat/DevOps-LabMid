@@ -1,0 +1,167 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assignment Submission Portal | Demo</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;padding:30px 15px;color:#1e293b}
+.container{max-width:850px;margin:auto}
+h1,h2{text-align:center}
+.subtitle{text-align:center;color:#64748b;margin-bottom:25px}
+.notice{background:#dbeafe;color:#1e40af;padding:13px;border-radius:8px;margin-bottom:20px}
+.card{background:white;padding:25px;border-radius:12px;margin-bottom:25px;box-shadow:0 3px 12px #0000000f}
+label{display:block;margin-top:15px;font-weight:bold}
+input{width:100%;padding:12px;margin-top:7px;border:1px solid #cbd5e1;border-radius:6px}
+button{width:100%;margin-top:22px;padding:13px;background:#2563eb;color:white;border:0;border-radius:6px;cursor:pointer;font-size:16px}
+button:hover{background:#1d4ed8}
+.message{padding:12px;border-radius:6px;margin-bottom:12px}
+.success{background:#dcfce7;color:#166534}
+.error{background:#fee2e2;color:#991b1b}
+.submission{border:1px solid #e2e8f0;padding:15px;border-radius:8px;margin-top:15px}
+.submission p{overflow-wrap:anywhere}
+a{color:#2563eb}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Assignment Submission Portal</h1>
+<p class="subtitle">Submit your assignments online</p>
+
+<div class="notice">
+<strong>GitHub Pages Static Demo:</strong>
+This is a frontend demonstration. Entries are stored in this browser only.
+The live Flask application handles actual server-side submissions.
+</div>
+
+<div class="card">
+<h2>Submit Your Assignment</h2>
+<div id="message" aria-live="polite"></div>
+
+<form id="submissionForm">
+<label for="name">Student Name</label>
+<input type="text" id="name" required placeholder="Enter your full name">
+
+<label for="registration_number">Registration Number</label>
+<input type="text" id="registration_number" required placeholder="Enter registration number">
+
+<label for="assignment_title">Assignment Title</label>
+<input type="text" id="assignment_title" required placeholder="Enter assignment title">
+
+<label for="submission_url">Submission URL</label>
+<input type="url" id="submission_url" required placeholder="https://example.com/assignment">
+
+<button type="submit">Submit Assignment</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Saved Submissions (<span id="count">0</span>)</h2>
+<div id="submissions"><p>No assignments submitted yet.</p></div>
+</div>
+</div>
+
+<script>
+const form = document.getElementById("submissionForm");
+const message = document.getElementById("message");
+const list = document.getElementById("submissions");
+const count = document.getElementById("count");
+
+let submissions = [];
+
+try {
+    submissions = JSON.parse(localStorage.getItem("assignmentDemo") || "[]");
+    if (!Array.isArray(submissions)) submissions = [];
+} catch {
+    submissions = [];
+}
+
+function renderSubmissions() {
+    count.textContent = submissions.length;
+    list.replaceChildren();
+
+    if (submissions.length === 0) {
+        list.textContent = "No assignments submitted yet.";
+        return;
+    }
+
+    submissions.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "submission";
+
+        const fields = [
+            ["Student: ", item.name],
+            ["Registration: ", item.registration_number],
+            ["Assignment: ", item.assignment_title]
+        ];
+
+        fields.forEach(([label, value]) => {
+            const p = document.createElement("p");
+            const strong = document.createElement("strong");
+            strong.textContent = label;
+            p.append(strong, document.createTextNode(value));
+            card.appendChild(p);
+        });
+
+        const p = document.createElement("p");
+        const link = document.createElement("a");
+        link.href = item.submission_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Open Assignment";
+        p.appendChild(link);
+        card.appendChild(p);
+        list.appendChild(card);
+    });
+}
+
+form.addEventListener("submit", event => {
+    event.preventDefault();
+
+    const item = {
+        name: document.getElementById("name").value.trim(),
+        registration_number: document.getElementById("registration_number").value.trim(),
+        assignment_title: document.getElementById("assignment_title").value.trim(),
+        submission_url: document.getElementById("submission_url").value.trim()
+    };
+
+    if (!item.name || !item.registration_number ||
+        !item.assignment_title || !item.submission_url) {
+        message.className = "message error";
+        message.textContent = "All fields are required.";
+        return;
+    }
+
+    try {
+        const url = new URL(item.submission_url);
+        if (!["http:", "https:"].includes(url.protocol) || !url.hostname.includes(".")) {
+            throw new Error("Invalid URL");
+        }
+    } catch {
+        message.className = "message error";
+        message.textContent = "Invalid submission URL. Enter a valid HTTP or HTTPS URL.";
+        return;
+    }
+
+    submissions.push(item);
+
+    try {
+        localStorage.setItem("assignmentDemo", JSON.stringify(submissions));
+    } catch {
+        submissions.pop();
+        message.className = "message error";
+        message.textContent = "Browser storage is unavailable.";
+        return;
+    }
+
+    message.className = "message success";
+    message.textContent = "Assignment submitted successfully!";
+    form.reset();
+    renderSubmissions();
+});
+
+renderSubmissions();
+</script>
+</body>
+</html>
