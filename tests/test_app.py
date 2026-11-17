@@ -26,7 +26,7 @@ def test_valid_submission_is_saved_and_displayed(client):
     }, follow_redirects=True)
 
     assert response.status_code == 200
-    assert b"DELIBERATE TEST FAILURE" in response.data
+    assert b"Assignment submitted successfully!" in response.data
     assert b"Ali Ahmed" in response.data
     assert b"FA23-BAI-001" in response.data
 
@@ -68,4 +68,5 @@ def test_invalid_submission_url_is_rejected(client):
 
     data_file = client.application.config["DATA_FILE"]
     assert not data_file.exists()
+
 
