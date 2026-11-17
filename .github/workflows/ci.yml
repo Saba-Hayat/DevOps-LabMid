@@ -32,7 +32,7 @@ jobs:
         run: |
           python -m pytest -v --json-report --json-report-file=pytest-report.json
 
-      - name: Send Test Report to Receiver
+      - name: Send Detailed Test Report to Receiver
         if: always()
         env:
           REPORT_URL: ${{ secrets.REPORT_URL }}
@@ -41,11 +41,13 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           python - <<'PY'
           import json
           import os
           from pathlib import Path
+          from datetime import datetime, timezone
           import requests
 
           report_file = Path("pytest-report.json")
@@ -57,6 +59,46 @@ jobs:
               raise SystemExit("REPORT_URL or REPORT_TOKEN secret is missing.")
 
           report = json.loads(report_file.read_text(encoding="utf-8"))
+          raw_tests = report.get("tests", [])
+
+          test_results = []
+
+          for test in raw_tests:
+              failure_message = None
+
+              for phase in ("setup", "call", "teardown"):
+                  phase_data = test.get(phase) or {}
+                  if phase_data.get("longrepr"):
+                      failure_message = str(phase_data["longrepr"])
+                      break
+
+              test_results.append({
+                  "name": test.get("nodeid", "Unknown test"),
+                  "result": test.get("outcome", "unknown"),
+                  "failure_message": failure_message
+              })
+
+          passed = sum(t["result"] == "passed" for t in test_results)
+          failed = sum(t["result"] == "failed" for t in test_results)
+          total = len(test_results)
+          overall_status = "PASSED" if failed == 0 and report.get("exitcode") == 0 else "FAILED"
+
+          timestamp = datetime.now(timezone.utc).isoformat()
+
+          report["execution_timestamp"] = timestamp
+          report["repository"] = os.environ["GITHUB_REPOSITORY"]
+          report["branch"] = os.environ["GITHUB_REF_NAME"]
+          report["commit_sha"] = os.environ["GITHUB_SHA"]
+          report["pipeline_run_id"] = os.environ["GITHUB_RUN_ID"]
+          report["overall_status"] = overall_status
+          report["test_results"] = test_results
+
+          report["summary"] = {
+              "total": total,
+              "passed": passed,
+              "failed": failed,
+              "overall_status": overall_status
+          }
 
           report["github"] = {
               "run_id": os.environ["GITHUB_RUN_ID"],
@@ -74,12 +116,13 @@ jobs:
 
           print("Receiver response:", response.status_code, response.text)
           response.raise_for_status()
-          print("Test report delivered successfully.")
-
+          print("Detailed test report delivered successfully.")
+          print("Overall status:", overall_status)
+          print("Total:", total, "Passed:", passed, "Failed:", failed)
           PY
 
       - name: Mark Pipeline Failed if Tests Failed
         if: always() && steps.tests.outcome == 'failure'
         run: |
-          echo "Automated tests failed. Check the test report."
+          echo "Automated tests failed. Check the delivered JSON report."
           exit 1

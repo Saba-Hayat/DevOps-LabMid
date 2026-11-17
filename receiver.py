@@ -1,5 +1,6 @@
 ﻿import os
 import json
+import secrets
 from pathlib import Path
 from flask import Flask, request, jsonify
 
@@ -14,9 +15,9 @@ def receive_report():
     if not REPORT_TOKEN:
         return jsonify({"error": "Receiver token is not configured"}), 500
 
-    received_token = request.headers.get("X-Report-Token")
+    received_token = request.headers.get("X-Report-Token", "")
 
-    if received_token != REPORT_TOKEN:
+    if not secrets.compare_digest(received_token, REPORT_TOKEN):
         return jsonify({"error": "Unauthorized"}), 401
 
     report = request.get_json(silent=True)
