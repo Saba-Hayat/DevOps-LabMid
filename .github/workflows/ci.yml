@@ -26,5 +26,60 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Automated Tests
-        run: python -m pytest -v
+      - name: Run Automated Tests and Generate JSON Report
+        id: tests
+        continue-on-error: true
+        run: |
+          python -m pytest -v --json-report --json-report-file=pytest-report.json
+
+      - name: Send Test Report to Receiver
+        if: always()
+        env:
+          REPORT_URL: ${{ secrets.REPORT_URL }}
+          REPORT_TOKEN: ${{ secrets.REPORT_TOKEN }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import requests
+
+          report_file = Path("pytest-report.json")
+
+          if not report_file.exists():
+              raise SystemExit("Pytest JSON report was not generated.")
+
+          if not os.environ.get("REPORT_URL") or not os.environ.get("REPORT_TOKEN"):
+              raise SystemExit("REPORT_URL or REPORT_TOKEN secret is missing.")
+
+          report = json.loads(report_file.read_text(encoding="utf-8"))
+
+          report["github"] = {
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commit": os.environ["GITHUB_SHA"],
+              "ref": os.environ["GITHUB_REF"]
+          }
+
+          response = requests.post(
+              os.environ["REPORT_URL"],
+              json=report,
+              headers={"X-Report-Token": os.environ["REPORT_TOKEN"]},
+              timeout=30
+          )
+
+          print("Receiver response:", response.status_code, response.text)
+          response.raise_for_status()
+          print("Test report delivered successfully.")
+
+          PY
+
+      - name: Mark Pipeline Failed if Tests Failed
+        if: always() && steps.tests.outcome == 'failure'
+        run: |
+          echo "Automated tests failed. Check the test report."
+          exit 1
