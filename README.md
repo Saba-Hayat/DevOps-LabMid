@@ -144,3 +144,30 @@ The required demonstration consists of:
 ## GitHub Repository
 
 https://github.com/Saba-Hayat/DevOps-LabMid
+
+## Automated Email Reporting
+
+The GitHub Actions workflow also sends the test execution report through Gmail.
+
+Configure these GitHub repository secrets:
+
+- `MAIL_USERNAME`: Gmail sender account.
+- `MAIL_PASSWORD`: Gmail App Password (not the normal Gmail password).
+- `MAIL_TO`: Email address that receives the report.
+
+Email delivery uses Gmail SMTP over SSL on port `465`.
+
+The email report includes the automated test results and execution summary.
+
+## GitHub Pages Deployment
+
+The project includes a static frontend in the `pages/` directory.
+
+GitHub Actions contains a separate deployment job for publishing the static frontend through GitHub Pages.
+
+To access the published website:
+
+1. Open the repository on GitHub.
+2. Go to **Settings → Pages**.
+3. Check the published website URL under **Visit site**.
+
